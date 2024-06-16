@@ -38,11 +38,13 @@ export class PewPew implements graphics.Game {
       this.stick = { x: 0, y: 0 };
       this.updateControls();
     });
-    document.getElementById("fire")!.addEventListener("touchdown", () => {
+    document.getElementById("fire")!.addEventListener("touchstart", () => {
+      document.getElementById("fire")!.style.opacity = "1";
       this.fire = true;
       this.updateControls();
     })
     document.getElementById("fire")!.addEventListener("touchend", () => {
+      document.getElementById("fire")!.style.opacity = "0.5";
       this.fire = false;
       this.updateControls();
     })
@@ -105,7 +107,6 @@ export class PewPew implements graphics.Game {
   }
 
   mouseUp(): void {
-    this.fire = false;
     this.updateControls();
   }
 

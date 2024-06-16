@@ -1,7 +1,7 @@
 import type { RuneClient } from "rune-games-sdk/multiplayer"
 
 export const VIEW_HEIGHT = 800 * 2;
-export const VIEW_WIDTH = 360 * 2;
+export const VIEW_WIDTH = 500 * 2;
 export const MOVE_SPEED = 10;
 
 export type Controls = {
