@@ -1,1 +1,2 @@
-# rune-shooter
+Simple shooter example
+
