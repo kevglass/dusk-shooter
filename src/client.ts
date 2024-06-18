@@ -6,9 +6,25 @@ import nipplejs, { JoystickManager } from "nipplejs";
 
 const playerCols = ["blue", "green", "orange", "red"];
 const DEAD_ZONE = 0.25;
+const TARGET_FPS = 40;
+
+function mulberry32(a: number) {
+  return function() {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+
+type Star = {
+  x: number,
+  y: number
+}
 
 export class PewPew implements graphics.Game {
   playerShips: graphics.GameImage[] = [];
+  playerBullets: graphics.GameImage[] = [];
   stick: { x: number, y: number } = { x: 0, y: 0 };
   keys: Record<string, boolean> = {};
   currentGame?: GameState;
@@ -17,6 +33,16 @@ export class PewPew implements graphics.Game {
   lastSentControlsTime: number = 0;
   font: graphics.GameFont;
   rock: graphics.GameImage;
+  rockParticle: graphics.GameImage;
+
+  stars: Star[] = [];
+
+  fps: number = 0;
+  frameCount: number = 0;
+  lastFrameCountTime: number = 0;
+  lastRender: number = 0;
+
+  localRand: () => number = mulberry32(12345);
 
   constructor() {
     graphics.init(graphics.RendererType.WEBGL, false, undefined, 5);
@@ -41,7 +67,7 @@ export class PewPew implements graphics.Game {
     document.getElementById("fire")!.addEventListener("touchstart", () => {
       document.getElementById("fire")!.style.opacity = "1";
       this.fire = true;
-      this.updateControls();
+      this.updateControls(true);
     })
     document.getElementById("fire")!.addEventListener("touchend", () => {
       document.getElementById("fire")!.style.opacity = "0.5";
@@ -51,18 +77,42 @@ export class PewPew implements graphics.Game {
 
     setInterval(() => {
       this.updateControls();
-    }, 125);
+    }, 150);
+    setInterval(() => {
+      this.addStar();
+    }, 250);
+
+    for (let i=0;i<1000;i++) {
+      this.addStar();
+      this.updateStars(4);
+    }  
 
     for (const col of playerCols) {
+      this.playerBullets.push(graphics.loadImage(ASSETS["laser_" + col + ".png"]));
       this.playerShips.push(graphics.loadImage(ASSETS["playerShip1_" + col + ".png"]));
     }
     this.rock = graphics.loadImage(ASSETS["meteorBrown_big1.png"]);
+    this.rockParticle = graphics.loadImage(ASSETS["meteorBrown_tiny1.png"]);
   }
 
-  updateControls(): void {
+  addStar() {
+    this.stars.push({
+      x: this.localRand() * VIEW_WIDTH,
+      y: 0
+    })
+  }
+
+  updateStars(delta: number) {
+    for (const star of this.stars) {
+      star.y += 20 * delta;
+    }
+    this.stars = this.stars.filter(s => s.y < VIEW_HEIGHT);
+  }
+
+  updateControls(force: boolean = false): void {
     if (this.currentGame) {
       const sinceLastControls = Date.now() - this.lastSentControlsTime;
-      if (sinceLastControls > 100) {
+      if (sinceLastControls > 100 || force) {
         let x = 0;
         let y = 0;
         if (this.keys['d']) {
@@ -112,11 +162,19 @@ export class PewPew implements graphics.Game {
 
   keyDown(key: string): void {
     this.keys[key] = true;
-    this.updateControls();
+    if (key === ' ') {
+      this.fire = true;
+      this.updateControls(true);
+    } else {
+      this.updateControls();
+    }
   }
 
   keyUp(key: string): void {
     this.keys[key] = false;
+    if (key === ' ') {
+      this.fire = false;
+    }
     this.updateControls();
   }
 
@@ -135,18 +193,48 @@ export class PewPew implements graphics.Game {
   }
 
   render(): void {
+    if (performance.now() - this.lastRender < 1000 / TARGET_FPS) {
+      return;
+    }
+
+    this.lastRender = performance.now();
+    this.frameCount++;
+    if (Date.now() - this.lastFrameCountTime > 1000) {
+      this.fps = this.frameCount;
+      this.frameCount = 0;
+      this.lastFrameCountTime = Date.now();
+    }
+    if (this.fps > 0) {
+      this.updateStars(30 / this.fps);
+    }
+
     const scaleh = graphics.height() / VIEW_HEIGHT;
     const scalew = graphics.width() / VIEW_WIDTH;
     graphics.push();
     graphics.scale(scalew, scaleh);
 
     if (this.currentGame) {
+      for (const star of this.stars) {
+        graphics.fillRect(star.x, star.y, 4, 4, "white");
+      }
+      for (const particle of this.currentGame.particles) {
+        if (particle.type === "ROCK") {
+          graphics.push();
+          graphics.rotate((particle.y * 0.01));
+          graphics.translate(particle.x, particle.y);
+          graphics.drawImage(this.rockParticle, -(this.rockParticle.width / 2), -(this.rockParticle.height / 2));
+          graphics.pop();
+        }
+      }
       for (const rock of this.currentGame.rocks) {
         graphics.push();
         graphics.rotate(rock.r + (rock.y * 0.01));
         graphics.translate(rock.x, rock.y);
         graphics.drawImage(this.rock, -(this.rock.width / 2), -(this.rock.height / 2));
         graphics.pop();
+      }
+      for (const bullet of this.currentGame.bullets) {
+        graphics.drawImage(this.playerBullets[bullet.ownerIndex], bullet.x - (this.playerBullets[0].width / 2), bullet.y - (this.playerBullets[0].height / 2));
       }
       for (const player of this.currentGame.players) {
         graphics.drawImage(this.playerShips[player.index], player.x - (this.playerShips[0].width / 2), player.y - (this.playerShips[0].height / 2));
@@ -155,7 +243,7 @@ export class PewPew implements graphics.Game {
     graphics.pop();
 
     if (this.currentGame) {
-      graphics.drawText(0, 20, ""+Rune.gameTime(), this.font);
+      graphics.drawText(0, 20, this.fps+"   "+Rune.gameTime()+" " + this.stars.length+" " +this.currentGame.rocks.length +" "+this.currentGame.particles.length, this.font);
     }
   }
 
