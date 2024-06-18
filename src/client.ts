@@ -1,7 +1,7 @@
 import { graphics } from "toglib";
 import { ASSETS } from "./lib/assets";
-import { OnChangeParams } from "rune-games-sdk";
-import { Controls, GameActions, GameState, VIEW_HEIGHT, VIEW_WIDTH } from "./logic";
+import { Interpolator, OnChangeParams } from "rune-games-sdk";
+import { BULLET_SPEED, Controls, GameActions, GameElement, GameState, MOVE_SPEED, PARTICLE_SPEED, ROCK_MAX_SPEED, VIEW_HEIGHT, VIEW_WIDTH } from "./logic";
 import nipplejs, { JoystickManager } from "nipplejs";
 
 const playerCols = ["blue", "green", "orange", "red"];
@@ -9,7 +9,7 @@ const DEAD_ZONE = 0.25;
 const TARGET_FPS = 40;
 
 function mulberry32(a: number) {
-  return function() {
+  return function () {
     let t = a += 0x6D2B79F5;
     t = Math.imul(t ^ t >>> 15, t | 1);
     t ^= t + Math.imul(t ^ t >>> 7, t | 61);
@@ -23,6 +23,8 @@ type Star = {
 }
 
 export class PewPew implements graphics.Game {
+  cols: string[] = ["#36bbf5", "#6fc834", "#ca4b26", "#ac3939"];
+  tinyShips: graphics.GameImage[] = [];
   playerShips: graphics.GameImage[] = [];
   playerBullets: graphics.GameImage[] = [];
   stick: { x: number, y: number } = { x: 0, y: 0 };
@@ -34,6 +36,7 @@ export class PewPew implements graphics.Game {
   font: graphics.GameFont;
   rock: graphics.GameImage;
   rockParticle: graphics.GameImage;
+  logo: graphics.GameImage;
 
   stars: Star[] = [];
 
@@ -41,13 +44,16 @@ export class PewPew implements graphics.Game {
   frameCount: number = 0;
   lastFrameCountTime: number = 0;
   lastRender: number = 0;
+  ang: number = 0;
 
   localRand: () => number = mulberry32(12345);
+  interpolators: Record<number, Interpolator<number[]>> = {};
+  localPlayerId: string = "";
 
   constructor() {
     graphics.init(graphics.RendererType.WEBGL, false, undefined, 5);
 
-    this.font = graphics.generateFont(16, "white");
+    this.font = graphics.generateFont(20, "white");
 
     const joystick: JoystickManager = nipplejs.create({
       mode: "static",
@@ -82,17 +88,19 @@ export class PewPew implements graphics.Game {
       this.addStar();
     }, 250);
 
-    for (let i=0;i<1000;i++) {
+    for (let i = 0; i < 1000; i++) {
       this.addStar();
       this.updateStars(4);
-    }  
+    }
 
     for (const col of playerCols) {
       this.playerBullets.push(graphics.loadImage(ASSETS["laser_" + col + ".png"]));
       this.playerShips.push(graphics.loadImage(ASSETS["playerShip1_" + col + ".png"]));
+      this.tinyShips.push(graphics.loadImage(ASSETS["playerLife1_" + col + ".png"]));
     }
     this.rock = graphics.loadImage(ASSETS["meteorBrown_big1.png"]);
     this.rockParticle = graphics.loadImage(ASSETS["meteorBrown_tiny1.png"]);
+    this.logo = graphics.loadImage(ASSETS["logo.png"]);
   }
 
   addStar() {
@@ -133,7 +141,7 @@ export class PewPew implements graphics.Game {
         if (this.stick.x < -DEAD_ZONE) {
           x = -1;
         }
-        if (this.stick.y> DEAD_ZONE) {
+        if (this.stick.y > DEAD_ZONE) {
           y = -1;
         }
         if (this.stick.y < -DEAD_ZONE) {
@@ -151,6 +159,9 @@ export class PewPew implements graphics.Game {
   }
 
   mouseDown(): void {
+    if (!this.inGame()) {
+      Rune.actions.join();
+    }
   }
 
   mouseDrag(): void {
@@ -178,8 +189,55 @@ export class PewPew implements graphics.Game {
     this.updateControls();
   }
 
+  getElementLocation(element: GameElement): { x: number, y: number } {
+    const lerp = this.interpolators[element.id];
+    if (lerp) {
+      const pos = lerp.getPosition();
+      return { x: pos[0], y: pos[1] };
+    }
+    return { x: element.x, y: element.y };
+  }
+
+  isLocalPlayer(game: GameElement): boolean {
+    return (game as any).playerId === this.localPlayerId;
+  }
+
+  updateInterpolators(game: GameElement[], futureGame: GameElement[], maxSpeed: number): void {
+    for (const element of game) {
+      if (!this.interpolators[element.id]) {
+        this.interpolators[element.id] = this.isLocalPlayer(element) ? Rune.interpolator<number[]>() : Rune.interpolatorLatency<number[]>({ maxSpeed });
+        this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
+      }
+      const futureElement = futureGame.find(e => e.id === element.id);
+      if (futureElement) {
+        this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [futureElement.x, futureElement.y] })
+      }
+    }
+  }
+
   gameUpdate(update: OnChangeParams<GameState, GameActions>): void {
     this.currentGame = update.game;
+    if (update.yourPlayerId) {
+      this.localPlayerId = update.yourPlayerId;
+    }
+
+    if (update.futureGame) {
+      this.updateInterpolators(update.game.rocks, update.futureGame.rocks, ROCK_MAX_SPEED);
+      this.updateInterpolators(update.game.bullets, update.futureGame.bullets, BULLET_SPEED);
+      this.updateInterpolators(update.game.particles, update.futureGame.particles, PARTICLE_SPEED);
+      this.updateInterpolators(update.game.players, update.futureGame.players, MOVE_SPEED);
+    }
+
+    const elements = [...update.game.rocks, ...update.game.bullets, ...update.game.particles, ...update.game.players];
+    const keyedElements: Record<number, GameElement> = {};
+    elements.forEach(e => keyedElements[e.id] = e);
+
+    for (const idString of Object.keys(this.interpolators)) {
+      const id = idString as any as number;
+      if (!keyedElements[id]) {
+        delete this.interpolators[id];
+      }
+    }
   }
 
   resourcesLoaded(): void {
@@ -192,12 +250,20 @@ export class PewPew implements graphics.Game {
     });
   }
 
+  inGame(): boolean {
+    if (this.currentGame) {
+      return this.currentGame.players.find(p => p.playerId === this.localPlayerId) != undefined;
+    }
+
+    return false;
+  }
+
   render(): void {
-    if (performance.now() - this.lastRender < 1000 / TARGET_FPS) {
+    if (Date.now() - this.lastRender < 1000 / TARGET_FPS) {
       return;
     }
 
-    this.lastRender = performance.now();
+    this.lastRender = Date.now();
     this.frameCount++;
     if (Date.now() - this.lastFrameCountTime > 1000) {
       this.fps = this.frameCount;
@@ -221,7 +287,8 @@ export class PewPew implements graphics.Game {
         if (particle.type === "ROCK") {
           graphics.push();
           graphics.rotate((particle.y * 0.01));
-          graphics.translate(particle.x, particle.y);
+          const location = this.getElementLocation(particle);
+          graphics.translate(location.x, location.y);
           graphics.drawImage(this.rockParticle, -(this.rockParticle.width / 2), -(this.rockParticle.height / 2));
           graphics.pop();
         }
@@ -229,21 +296,59 @@ export class PewPew implements graphics.Game {
       for (const rock of this.currentGame.rocks) {
         graphics.push();
         graphics.rotate(rock.r + (rock.y * 0.01));
-        graphics.translate(rock.x, rock.y);
+        const location = this.getElementLocation(rock);
+        graphics.translate(location.x, location.y);
         graphics.drawImage(this.rock, -(this.rock.width / 2), -(this.rock.height / 2));
         graphics.pop();
       }
       for (const bullet of this.currentGame.bullets) {
-        graphics.drawImage(this.playerBullets[bullet.ownerIndex], bullet.x - (this.playerBullets[0].width / 2), bullet.y - (this.playerBullets[0].height / 2));
+        const location = this.getElementLocation(bullet);
+        graphics.drawImage(this.playerBullets[bullet.ownerIndex], location.x - (this.playerBullets[0].width / 2), location.y - (this.playerBullets[0].height / 2));
       }
       for (const player of this.currentGame.players) {
-        graphics.drawImage(this.playerShips[player.index], player.x - (this.playerShips[0].width / 2), player.y - (this.playerShips[0].height / 2));
+        const location = this.getElementLocation(player);
+        graphics.drawImage(this.playerShips[player.index], location.x - (this.playerShips[0].width / 2), location.y - (this.playerShips[0].height / 2));
       }
     }
     graphics.pop();
 
+    this.ang += 0.1;
+
     if (this.currentGame) {
-      graphics.drawText(0, 20, this.fps+"   "+Rune.gameTime()+" " + this.stars.length+" " +this.currentGame.rocks.length +" "+this.currentGame.particles.length, this.font);
+      if (!this.inGame()) {
+        const h = (this.logo.height / this.logo.width) * graphics.width();
+        graphics.drawImage(this.logo, 0, 0, graphics.width(), h);
+        const col = "#46faee";
+        let msg = "";
+
+        if (this.currentGame.players.length === 0) {
+          msg = "Tap to Start The Battle";
+        } else {
+          msg = "Tap to Join The Battle";
+        }
+        graphics.drawText(Math.floor((graphics.width() - graphics.textWidth(msg, this.font)) / 2), 250 + (Math.sin(this.ang) * 20), msg, this.font, col);
+      } else {
+        // HUD
+        const localPlayer = this.currentGame.players.find(p => p.playerId === this.localPlayerId);
+        if (localPlayer) {
+          graphics.drawImage(this.tinyShips[localPlayer.index], 0, 0);
+          for (let i = 0; i < localPlayer.health; i++) {
+            graphics.fillRect(35 + (i * 20), 2, 18, 10, this.cols[localPlayer.index])
+          }
+
+          let index = 0;
+          for (const p of this.currentGame.players) {
+            if (p === localPlayer) {
+              continue;
+            }
+            graphics.drawImage(this.tinyShips[p.index], graphics.width() - 17, index * 15, 17, 13);
+            for (let i = 0; i < p.health; i++) {
+              graphics.fillRect(graphics.width() - 29 - (i * 12), 4 + (index *15), 10, 6, this.cols[p.index])
+            }
+            index++;
+          }
+        }
+      }
     }
   }
 
