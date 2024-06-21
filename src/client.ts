@@ -1,12 +1,12 @@
-import { graphics } from "toglib";
+import { graphics, sound } from "toglib";
 import { ASSETS } from "./lib/assets";
 import { Interpolator, OnChangeParams } from "rune-games-sdk";
-import { BULLET_SPEED, Controls, GameActions, GameElement, GameState, MOVE_SPEED, PARTICLE_SPEED, ROCK_MAX_SPEED, VIEW_HEIGHT, VIEW_WIDTH } from "./logic";
+import { BULLET_SPEED, Controls, ENEMY_MOVE_SPEED, EnemyColor, EnemyColors as enemyColors, GameActions, GameElement, GameState, getPhase, MOVE_SPEED, PARTICLE_SPEED, ParticleType, ROCK_MAX_SPEED, VIEW_HEIGHT, VIEW_WIDTH } from "./logic";
 import nipplejs, { JoystickManager } from "nipplejs";
 
 const playerCols = ["blue", "green", "orange", "red"];
 const DEAD_ZONE = 0.25;
-const TARGET_FPS = 40;
+const TARGET_FPS = 60;
 
 function mulberry32(a: number) {
   return function () {
@@ -19,13 +19,15 @@ function mulberry32(a: number) {
 
 type Star = {
   x: number,
-  y: number
+  y: number,
+  vy: number
 }
 
 export class PewPew implements graphics.Game {
   cols: string[] = ["#36bbf5", "#6fc834", "#ca4b26", "#ac3939"];
   tinyShips: graphics.GameImage[] = [];
   playerShips: graphics.GameImage[] = [];
+  enemyShips: Record<EnemyColor, graphics.GameImage[]>;
   playerBullets: graphics.GameImage[] = [];
   stick: { x: number, y: number } = { x: 0, y: 0 };
   keys: Record<string, boolean> = {};
@@ -34,9 +36,22 @@ export class PewPew implements graphics.Game {
   fire: boolean = false;
   lastSentControlsTime: number = 0;
   font: graphics.GameFont;
+  scoreFont: graphics.GameFont;
   rock: graphics.GameImage;
   rockParticle: graphics.GameImage;
+  star1Particle: graphics.GameImage;
+  star2Particle: graphics.GameImage;
+  star3Particle: graphics.GameImage;
+  enemyBullet: graphics.GameImage;
   logo: graphics.GameImage;
+  fireSound: sound.Sound;
+  explodeSound: sound.Sound;
+  dieSound: sound.Sound;
+  hitSound: sound.Sound;
+  music: sound.Sound;
+  musicStarted: boolean = false;
+
+  particleImages: Record<ParticleType, graphics.GameImage>;
 
   stars: Star[] = [];
 
@@ -44,16 +59,18 @@ export class PewPew implements graphics.Game {
   frameCount: number = 0;
   lastFrameCountTime: number = 0;
   lastRender: number = 0;
-  ang: number = 0;
 
   localRand: () => number = mulberry32(12345);
   interpolators: Record<number, Interpolator<number[]>> = {};
+  interpolatorAngles: Record<number, number> = {};
+
   localPlayerId: string = "";
 
   constructor() {
     graphics.init(graphics.RendererType.WEBGL, false, undefined, 5);
 
-    this.font = graphics.generateFont(20, "white");
+    this.font = graphics.generateFont(16, "white");
+    this.scoreFont = graphics.generateFont(14, "white");
 
     const joystick: JoystickManager = nipplejs.create({
       mode: "static",
@@ -88,31 +105,55 @@ export class PewPew implements graphics.Game {
       this.addStar();
     }, 250);
 
-    for (let i = 0; i < 1000; i++) {
-      this.addStar();
-      this.updateStars(4);
-    }
-
     for (const col of playerCols) {
       this.playerBullets.push(graphics.loadImage(ASSETS["laser_" + col + ".png"]));
       this.playerShips.push(graphics.loadImage(ASSETS["playerShip1_" + col + ".png"]));
       this.tinyShips.push(graphics.loadImage(ASSETS["playerLife1_" + col + ".png"]));
     }
+
+    this.enemyShips = {
+      Black: [],
+      Blue: [],
+      Green: [],
+      Red: [],
+    }
+    for (const col of enemyColors) {
+      for (let index = 0; index < 5; index++) {
+        this.enemyShips[col][index] = graphics.loadImage(ASSETS["enemies/enemy" + col + "" + (index + 1) + ".png"])
+      }
+    }
     this.rock = graphics.loadImage(ASSETS["meteorBrown_big1.png"]);
     this.rockParticle = graphics.loadImage(ASSETS["meteorBrown_tiny1.png"]);
+    this.star1Particle = graphics.loadImage(ASSETS["star1.png"]);
+    this.star2Particle = graphics.loadImage(ASSETS["star2.png"]);
+    this.star3Particle = graphics.loadImage(ASSETS["star3.png"]);
+    this.enemyBullet = graphics.loadImage(ASSETS["enemyBullet.png"]);
     this.logo = graphics.loadImage(ASSETS["logo.png"]);
+    this.fireSound = sound.loadSound(ASSETS["lazer.mp3"]);
+    this.explodeSound = sound.loadSound(ASSETS["explode.mp3"]);
+    this.hitSound = sound.loadSound(ASSETS["hit.mp3"]);
+    this.dieSound = sound.loadSound(ASSETS["die.mp3"]);
+    this.music = sound.loadSound(ASSETS["music.mp3"]);
+
+    this.particleImages = {
+      ROCK: this.rockParticle,
+      STAR1: this.star1Particle,
+      STAR2: this.star2Particle,
+      STAR3: this.star3Particle,
+    }
   }
 
   addStar() {
     this.stars.push({
       x: this.localRand() * VIEW_WIDTH,
-      y: 0
+      y: 0,
+      vy: this.localRand() > 0.5 ? 0.5 : 1
     })
   }
 
   updateStars(delta: number) {
     for (const star of this.stars) {
-      star.y += 20 * delta;
+      star.y += 20 * delta * star.vy;
     }
     this.stars = this.stars.filter(s => s.y < VIEW_HEIGHT);
   }
@@ -168,6 +209,7 @@ export class PewPew implements graphics.Game {
   }
 
   mouseUp(): void {
+
     this.updateControls();
   }
 
@@ -205,11 +247,27 @@ export class PewPew implements graphics.Game {
   updateInterpolators(game: GameElement[], futureGame: GameElement[], maxSpeed: number): void {
     for (const element of game) {
       if (!this.interpolators[element.id]) {
-        this.interpolators[element.id] = this.isLocalPlayer(element) ? Rune.interpolator<number[]>() : Rune.interpolatorLatency<number[]>({ maxSpeed });
-        this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
+        if (this.isLocalPlayer(element)) {
+          this.interpolators[element.id] = Rune.interpolator<number[]>();
+          this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
+        } else {
+          const latency = Rune.interpolatorLatency<number[]>({ maxSpeed });
+          this.interpolators[element.id] = latency
+          this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
+          latency.jump([element.x, element.y]);
+        }
       }
       const futureElement = futureGame.find(e => e.id === element.id);
       if (futureElement) {
+        const dy = futureElement.y - element.y;
+        const dx = futureElement.x - element.x;
+        if (dx === 0 && dy === 0) {
+          this.interpolatorAngles[element.id] = Math.PI / 2;
+        } else {
+          this.interpolatorAngles[element.id] = Math.atan2(dy, dx)
+        }
+        // this.interpolatorAngles[element.id] = Math.atan2(-1, -5)
+
         this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [futureElement.x, futureElement.y] })
       }
     }
@@ -221,14 +279,30 @@ export class PewPew implements graphics.Game {
       this.localPlayerId = update.yourPlayerId;
     }
 
+    for (const event of this.currentGame.events) {
+      if (event.type === "FIRE" && event.who === this.localPlayerId) {
+        sound.playSound(this.fireSound);
+      }
+      if (event.type === "EXPLODE") {
+        sound.playSound(this.explodeSound);
+      }
+      if (event.type === "HIT" && event.who === this.localPlayerId) {
+        sound.playSound(this.hitSound);
+      }
+      if (event.type === "DIE" && event.who === this.localPlayerId) {
+        sound.playSound(this.dieSound);
+      }
+    }
+
     if (update.futureGame) {
       this.updateInterpolators(update.game.rocks, update.futureGame.rocks, ROCK_MAX_SPEED);
       this.updateInterpolators(update.game.bullets, update.futureGame.bullets, BULLET_SPEED);
       this.updateInterpolators(update.game.particles, update.futureGame.particles, PARTICLE_SPEED);
       this.updateInterpolators(update.game.players, update.futureGame.players, MOVE_SPEED);
+      this.updateInterpolators(update.game.enemies, update.futureGame.enemies, ENEMY_MOVE_SPEED * getPhase(update.game).speedModifier);
     }
 
-    const elements = [...update.game.rocks, ...update.game.bullets, ...update.game.particles, ...update.game.players];
+    const elements = [...update.game.rocks, ...update.game.bullets, ...update.game.particles, ...update.game.players, ...update.game.enemies];
     const keyedElements: Record<number, GameElement> = {};
     elements.forEach(e => keyedElements[e.id] = e);
 
@@ -236,6 +310,7 @@ export class PewPew implements graphics.Game {
       const id = idString as any as number;
       if (!keyedElements[id]) {
         delete this.interpolators[id];
+        delete this.interpolatorAngles[id];
       }
     }
   }
@@ -280,18 +355,22 @@ export class PewPew implements graphics.Game {
     graphics.scale(scalew, scaleh);
 
     if (this.currentGame) {
+      if (!this.musicStarted && this.music.buffer) {
+        this.musicStarted = true;
+        sound.loopSound(this.music, 0.25);
+      }
+
       for (const star of this.stars) {
-        graphics.fillRect(star.x, star.y, 4, 4, "white");
+        graphics.drawImage(this.star1Particle, star.x, star.y, this.star1Particle.width, this.star1Particle.height, star.vy === 1 ? "white" : "blue")
       }
       for (const particle of this.currentGame.particles) {
-        if (particle.type === "ROCK") {
-          graphics.push();
-          graphics.rotate((particle.y * 0.01));
-          const location = this.getElementLocation(particle);
-          graphics.translate(location.x, location.y);
-          graphics.drawImage(this.rockParticle, -(this.rockParticle.width / 2), -(this.rockParticle.height / 2));
-          graphics.pop();
-        }
+        const image = this.particleImages[particle.type];
+        graphics.push();
+        graphics.rotate((particle.y * 0.01));
+        const location = this.getElementLocation(particle);
+        graphics.translate(location.x, location.y);
+        graphics.drawImage(image, -(image.width / 2), -(image.height / 2));
+        graphics.pop();
       }
       for (const rock of this.currentGame.rocks) {
         graphics.push();
@@ -301,18 +380,37 @@ export class PewPew implements graphics.Game {
         graphics.drawImage(this.rock, -(this.rock.width / 2), -(this.rock.height / 2));
         graphics.pop();
       }
+      for (const enemy of this.currentGame.enemies) {
+        const location = this.getElementLocation(enemy);
+        const lastHit = Rune.gameTime() - enemy.lastHit;
+        const image = this.enemyShips[enemy.col][enemy.index];
+        graphics.push();
+        graphics.rotate((this.interpolatorAngles[enemy.id] ?? 0) - (Math.PI/2));
+        graphics.translate(location.x, location.y);
+        if (lastHit < 150) {
+          graphics.drawImage(image, -(image.width / 2), - (image.height / 2), image.width, image.height, "red");
+        } else {
+          graphics.drawImage(image, -(image.width / 2), - (image.height / 2));
+        }
+        graphics.pop();
+      }
       for (const bullet of this.currentGame.bullets) {
         const location = this.getElementLocation(bullet);
-        graphics.drawImage(this.playerBullets[bullet.ownerIndex], location.x - (this.playerBullets[0].width / 2), location.y - (this.playerBullets[0].height / 2));
+        const image = bullet.type === "PLAYER" ? this.playerBullets[bullet.ownerIndex] : this.enemyBullet;
+        graphics.drawImage(image, location.x - (image.width / 2), location.y - (image.height / 2));
       }
       for (const player of this.currentGame.players) {
         const location = this.getElementLocation(player);
-        graphics.drawImage(this.playerShips[player.index], location.x - (this.playerShips[0].width / 2), location.y - (this.playerShips[0].height / 2));
+        const lastHit = Rune.gameTime() - player.lastHit;
+        const image = this.playerShips[player.index];
+        if (lastHit < 3000 && Math.floor(lastHit / 200) % 2 == 0) {
+          graphics.drawImage(image, location.x - (image.width / 2), location.y - (image.height / 2), image.width, image.height, "red");
+        } else {
+          graphics.drawImage(image, location.x - (image.width / 2), location.y - (image.height / 2));
+        }
       }
     }
     graphics.pop();
-
-    this.ang += 0.1;
 
     if (this.currentGame) {
       if (!this.inGame()) {
@@ -322,11 +420,11 @@ export class PewPew implements graphics.Game {
         let msg = "";
 
         if (this.currentGame.players.length === 0) {
-          msg = "Tap to Start The Battle";
+          msg = "Tap to Start The Battle".toUpperCase();
         } else {
-          msg = "Tap to Join The Battle";
+          msg = "Tap to Join The Battle".toUpperCase();
         }
-        graphics.drawText(Math.floor((graphics.width() - graphics.textWidth(msg, this.font)) / 2), 250 + (Math.sin(this.ang) * 20), msg, this.font, col);
+        graphics.drawText(Math.floor((graphics.width() - graphics.textWidth(msg, this.font)) / 2), 300 + (Math.sin(Date.now() * 0.005) * 20), msg, this.font, col);
       } else {
         // HUD
         const localPlayer = this.currentGame.players.find(p => p.playerId === this.localPlayerId);
@@ -335,6 +433,10 @@ export class PewPew implements graphics.Game {
           for (let i = 0; i < localPlayer.health; i++) {
             graphics.fillRect(35 + (i * 20), 2, 18, 10, this.cols[localPlayer.index])
           }
+          graphics.fillRect(35, 14, localPlayer.gunTemp * 60, 5, localPlayer.gunTemp >= 0.9 ? "red" : "orange");
+
+          const score = ("" + localPlayer.score).padStart(10, "0");
+          graphics.drawText(Math.floor((graphics.width() - graphics.textWidth(score, this.scoreFont)) / 2), 15, score, this.scoreFont);
 
           let index = 0;
           for (const p of this.currentGame.players) {
@@ -343,7 +445,7 @@ export class PewPew implements graphics.Game {
             }
             graphics.drawImage(this.tinyShips[p.index], graphics.width() - 17, index * 15, 17, 13);
             for (let i = 0; i < p.health; i++) {
-              graphics.fillRect(graphics.width() - 29 - (i * 12), 4 + (index *15), 10, 6, this.cols[p.index])
+              graphics.fillRect(graphics.width() - 29 - (i * 12), 4 + (index * 15), 10, 6, this.cols[p.index])
             }
             index++;
           }
