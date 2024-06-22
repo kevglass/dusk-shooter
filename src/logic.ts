@@ -1,17 +1,38 @@
 import type { RuneClient } from "rune-games-sdk/multiplayer"
 
+// change this to generate a different game
+export const LEVELS_SEED = 1
+
 export const VIEW_HEIGHT = 800 * 2;
 export const VIEW_WIDTH = 500 * 2;
 export const SPEED_SCALE = 2;
-export const MOVE_SPEED = 10 * SPEED_SCALE;
+export const MOVE_SPEED = 13 * SPEED_SCALE;
 export const ROCK_MAX_SPEED = 12 * SPEED_SCALE;
 export const BULLET_SPEED = 40 * SPEED_SCALE;
 export const PARTICLE_SPEED = 20 * SPEED_SCALE;
-export const ENEMY_MOVE_SPEED = 40 * SPEED_SCALE;
+export const ENEMY_MOVE_SPEED = 30 * SPEED_SCALE;
 export const GUN_TEMP_PER_SHOT = 0.02;
 export const GUN_TEMP_COOL_DOWN = 0.04;
+export const PHASE_START_TIME = 4000;
+export const POWER_UP_DRIFT_SPEED = 4 * SPEED_SCALE;
 
 export type ParticleType = "ROCK" | "STAR1" | "STAR2" | "STAR3";
+
+export const MESSAGES = [
+  "All your base are belong to us",
+  "Nuke from orbit only way to be sure",
+  "Someone set up us the bomb",
+  "I'll be back",
+  "You have no chance to survive, make your time",
+  "Do. Or do not. There is no try",
+  "We are an impossibility in an impossible universe",
+  "You are on the way to destruction",
+  "Dead or alive, you're coming with me!",
+  "For great justice",
+  "Khaaaaaaaaan!",
+  "Take off every zig!!",
+  "By Grabthar’s hammer, by the suns of Worvan, you shall be avenged",
+];
 
 type Point = {
   x: number,
@@ -39,10 +60,10 @@ entryPoints.push({ x: -50, y: VIEW_HEIGHT * 0.5 });
 entryPoints.push({ x: VIEW_WIDTH + 50, y: VIEW_HEIGHT * 0.5 });
 
 exitPoints.push(...entryPoints);
-exitPoints.push({ x: -50, y: VIEW_HEIGHT * 0.75 });
-exitPoints.push({ x: VIEW_WIDTH + 50, y: VIEW_HEIGHT * 0.75 });
-exitPoints.push({ x: -50, y: VIEW_HEIGHT * 0.75 });
-exitPoints.push({ x: VIEW_WIDTH + 50, y: VIEW_HEIGHT * 0.75 });
+exitPoints.push({ x: -50, y: VIEW_HEIGHT * 0.65 });
+exitPoints.push({ x: VIEW_WIDTH + 50, y: VIEW_HEIGHT * 0.65 });
+exitPoints.push({ x: -50, y: VIEW_HEIGHT * 0.65 });
+exitPoints.push({ x: VIEW_WIDTH + 50, y: VIEW_HEIGHT * 0.65 });
 
 function mulberry32(a: number) {
   return function () {
@@ -54,7 +75,7 @@ function mulberry32(a: number) {
 }
 
 const seededRandomNumbers: number[] = [];
-const initialSeededRandomNumber = mulberry32(12345);
+const initialSeededRandomNumber = mulberry32(LEVELS_SEED);
 for (let i = 0; i < 5000; i++) {
   seededRandomNumbers[i] = initialSeededRandomNumber();
 }
@@ -73,15 +94,18 @@ export type Phase = {
   rockInterval: number;
   bomberPause: number;
   speedModifier: number;
+  enemyCount: number;
+  msg: string;
 }
-
-const _PHASES: Phase[] = [
-  { enemyInterval: 6000, rockInterval: 5000, bomberPause: 3000, speedModifier: 1 },
-  { enemyInterval: 6000, rockInterval: 5000, bomberPause: 3000, speedModifier: 1 },
-]
 
 export type EnemyPath = PointAndWait[];
 
+export type PowerUpType = "DOUBLE_SHOT" | "FAST_FIRE" | "HEALTH" | "SHIELD" | "SPEED";
+export const powerUpTypes: PowerUpType[] = ["DOUBLE_SHOT", "FAST_FIRE", "HEALTH", "SHIELD", "SPEED"];
+
+export type PowerUp = GameElement & {
+  type: PowerUpType;
+}
 export type Enemy = GameElement & {
   start: number;
   waitUntil: number;
@@ -96,6 +120,7 @@ export type Enemy = GameElement & {
   health: number;
   value: number;
   needsShoot: boolean;
+  wave: number;
 }
 
 export type Controls = {
@@ -140,14 +165,16 @@ export type Player = GameElement & {
   lastFire: number;
   radius: number;
   lastHit: number;
-  bulletSize: number;
   fireInterval: number;
   score: number;
   gunTemp: number;
+  shots: number;
+  maxHealth: number;
+  moveModifier: number;
 }
 
 export type GameEvent = {
-  type: "FIRE" | "EXPLODE" | "HIT" | "DIE";
+  type: "FIRE" | "EXPLODE" | "HIT" | "DIE" | "COLLECT";
   who?: string;
 }
 
@@ -157,6 +184,7 @@ export interface GameState {
   bullets: Bullet[];
   players: Player[];
   enemies: Enemy[];
+  powerUps: PowerUp[];
   rocks: Rock[];
   lastRock: number;
   nextId: number;
@@ -164,6 +192,9 @@ export interface GameState {
   lastEnemy: number;
   phase: number;
   nextRandom: number;
+  phaseStart: number;
+  phaseInfo: Phase;
+  waveCounts: number[];
 }
 
 export type GameActions = {
@@ -196,10 +227,12 @@ function addPlayer(state: GameState, id: string) {
     lastFire: 0,
     radius: 20,
     lastHit: -10000, // set it in the past so they don't suddenly get a hit marker,
-    bulletSize: 5,
     fireInterval: 150,
     score: 0,
     gunTemp: 0,
+    shots: 1,
+    maxHealth: 3,
+    moveModifier: 0.75
   })
 }
 
@@ -223,6 +256,25 @@ function particleSpray(game: GameState, type: ParticleType, element: GameElement
   }
 }
 
+function createPhase(index: number): Phase {
+  index--;
+
+  return {
+    enemyInterval: Math.max(1000, 5250 - (index * 150)),
+    rockInterval: Math.max(6000 - (index * 25)),
+    bomberPause: Math.max(3000 - (index * 100)),
+    speedModifier: Math.max(1.5, 1 + (index * 0.01)),
+    enemyCount: 5 + (index * 2),
+    msg: MESSAGES[index % MESSAGES.length]
+  }
+}
+
+function startPhase(game: GameState): void {
+  game.phase++;
+  game.phaseStart = Rune.gameTime() + PHASE_START_TIME;
+  game.phaseInfo = createPhase(game.phase);
+}
+
 function resetGame(game: GameState): void {
   game.lastEnemy = Rune.gameTime();
   game.phase = 0;
@@ -231,7 +283,9 @@ function resetGame(game: GameState): void {
   game.rocks = [];
   game.bullets = [];
   game.particles = [];
-  game.lastEnemy = -getPhase(game).enemyInterval;
+  game.waveCounts = [];
+  game.powerUps = [];
+  startPhase(game);
 }
 
 function randomInContextOfGame(game: GameState): number {
@@ -239,6 +293,13 @@ function randomInContextOfGame(game: GameState): number {
 }
 
 function spawnEnemy(game: GameState): number {
+  if (game.phaseInfo.enemyCount <= 0) {
+    startPhase(game);
+    return 0;
+  }
+
+  game.phaseInfo.enemyCount--;
+
   const rand = () => { return randomInContextOfGame(game) }
 
   const startPoint = entryPoints[Math.floor(rand() * entryPoints.length)];
@@ -252,7 +313,7 @@ function spawnEnemy(game: GameState): number {
       pts.push({ ...controlPoints[Math.floor(rand() * controlPoints.length)], wait: 0 });
     }
 
-    const count = (rand() * 3) + 5;
+    const count = Math.floor((rand() * 3) + 5);
     const index = Math.floor(rand() * 5);
     const col = rand() > 0.5 ? "Red" : "Green";
 
@@ -275,38 +336,88 @@ function spawnEnemy(game: GameState): number {
         health: 1,
         lastHit: -20000, // not invulnerable to start with,
         needsShoot: false,
-        value: 100
+        value: 100,
+        wave: game.phaseInfo.enemyCount
       })
     }
+    game.waveCounts[game.phaseInfo.enemyCount] = count;
 
     return 0;
   } else {
     // single sit and shoot
     const bombingPoints = controlPoints.filter(p => p.y < VIEW_HEIGHT / 2);
-    const singleControlPoint = bombingPoints[Math.floor(rand() * bombingPoints.length)];
+    const count = game.phase > 5 ? 3 : game.phase > 2 ? 2 : 1;
+    const col = rand() > 0.5 ? "Blue" : "Black";
+    const index = Math.floor(rand() * 5);
 
-    game.enemies.push({
-      x: startPoint.x,
-      y: startPoint.y,
-      id: game.nextId++,
-      radius: 50,
-      start: Rune.gameTime(),
-      waitUntil: 0,
-      index: Math.floor(rand() * 5),
-      col: rand() > 0.5 ? "Blue" : "Black",
-      pt: 1,
-      path: [{ ...startPoint, wait: 0 }, { ...singleControlPoint, wait: getPhase(game).bomberPause }, { ...exitPoint, wait: 0 }],
-      shoot: true,
-      speed: moveSpeed,
-      pos: 0,
-      health: 4,
-      lastHit: -20000, // not invulnerable to start with,
-      needsShoot: false,
-      value: 100 * 4
-    })
+    for (let i = 0; i < count; i++) {
+      const singleControlPoint = bombingPoints[Math.floor(rand() * bombingPoints.length)];
+      bombingPoints.splice(bombingPoints.indexOf(singleControlPoint), 1);
+
+      game.enemies.push({
+        x: startPoint.x,
+        y: startPoint.y,
+        id: game.nextId++,
+        radius: 50,
+        start: Rune.gameTime(),
+        waitUntil: 0,
+        index,
+        col,
+        pt: 1,
+        path: [{ ...startPoint, wait: 0 }, { ...singleControlPoint, wait: getPhase(game).bomberPause }, { ...exitPoint, wait: 0 }],
+        shoot: true,
+        speed: moveSpeed,
+        pos: 0,
+        health: 4,
+        lastHit: -20000, // not invulnerable to start with,
+        needsShoot: false,
+        value: 100 * 4,
+        wave: game.phaseInfo.enemyCount
+      })
+    }
   }
 
   return 500;
+}
+
+function collectPowerUp(game: GameState, player: Player, powerUp: PowerUp): void {
+  if (powerUp.type === "DOUBLE_SHOT") {
+    player.shots = 2;
+  }
+  if (powerUp.type === "SHIELD") {
+    player.maxHealth = 4;
+  }
+  if (powerUp.type === "HEALTH") {
+    player.health = Math.min(player.health + 1, player.maxHealth);
+  }
+  if (powerUp.type === "FAST_FIRE") {
+    player.fireInterval = 110;
+  }
+  if (powerUp.type === "SPEED") {
+    player.moveModifier = 1;
+  }
+
+  particleSpray(game, "STAR3", powerUp, 8);
+  game.events.push({
+    type: "COLLECT",
+    who: player.playerId
+  })
+
+}
+
+function spawnPowerUp(game: GameState, target: GameElement): void {
+  // only spawn 1 in 3
+  if (Math.random() > 0.3) {
+    return;
+  }
+
+  game.powerUps.push({
+    x: target.x,
+    y: target.y,
+    id: game.nextId++,
+    radius: 30,
+    type: powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)]
+  })
 }
 
 function damageEnemy(game: GameState, enemy: Enemy, remove?: Bullet): void {
@@ -324,6 +435,16 @@ function damageEnemy(game: GameState, enemy: Enemy, remove?: Bullet): void {
         player.score += enemy.value;
       }
     }
+
+    if (game.waveCounts[enemy.wave]) {
+      game.waveCounts[enemy.wave]--;
+      if (game.waveCounts[enemy.wave] === 0) {
+        // killed all the enemies in a wave, spawn power up
+        spawnPowerUp(game, enemy);
+        delete game.waveCounts[enemy.wave];
+      }
+    }
+
     // remove rock and bullet
     game.enemies.splice(game.enemies.indexOf(enemy), 1);
     // add particles
@@ -372,7 +493,7 @@ function takeDamage(game: GameState, player: Player) {
 }
 
 export function getPhase(game: GameState): Phase {
-  return _PHASES[Math.min(_PHASES.length, game.phase)];
+  return game.phaseInfo;
 }
 
 Rune.initLogic({
@@ -392,11 +513,12 @@ Rune.initLogic({
       lastEnemy: 0,
       phase: 0,
       nextRandom: 0,
+      phaseStart: 0,
+      phaseInfo: createPhase(0),
+      waveCounts: [],
+      powerUps: []
     }
 
-    // delay first enemy
-    state.lastEnemy = -getPhase(state).enemyInterval / 2;
-    
     return state;
   },
   updatesPerSecond: 20,
@@ -418,35 +540,61 @@ Rune.initLogic({
       return;
     }
 
-    if (Rune.gameTime() - context.game.lastEnemy > getPhase(game).enemyInterval) {
-      context.game.lastEnemy = Rune.gameTime() - spawnEnemy(context.game);
-    }
-
     for (const player of game.players) {
-      player.x += player.controls.x * MOVE_SPEED;
-      player.y += player.controls.y * MOVE_SPEED;
+      player.x += player.controls.x * MOVE_SPEED * player.moveModifier;
+      player.y += player.controls.y * MOVE_SPEED * player.moveModifier;
 
       player.x = Math.min(Math.max(0, player.x), VIEW_WIDTH);
       player.y = Math.min(Math.max(0, player.y), VIEW_HEIGHT);
 
       if (player.controls.fire && Rune.gameTime() - player.lastFire > player.fireInterval * (player.gunTemp > 0.9 ? 2 : 1)) {
-        game.bullets.push({
-          id: game.nextId++,
-          x: player.x,
-          y: player.y,
-          radius: player.bulletSize,
-          vy: -BULLET_SPEED,
-          vx: 0,
-          ownerIndex: player.index,
-          owner: player.id,
-          type: "PLAYER"
-        })
+        if (player.shots === 2) {
+          game.bullets.push({
+            id: game.nextId++,
+            x: player.x - 20,
+            y: player.y + 5,
+            radius: 5,
+            vy: -BULLET_SPEED,
+            vx: 0,
+            ownerIndex: player.index,
+            owner: player.id,
+            type: "PLAYER"
+          })
+          game.bullets.push({
+            id: game.nextId++,
+            x: player.x + 20,
+            y: player.y + 5,
+            radius: 5,
+            vy: -BULLET_SPEED,
+            vx: 0,
+            ownerIndex: player.index,
+            owner: player.id,
+            type: "PLAYER"
+          })
+          player.gunTemp += GUN_TEMP_PER_SHOT;
+          player.gunTemp += GUN_TEMP_PER_SHOT;
+        } else {
+          game.bullets.push({
+            id: game.nextId++,
+            x: player.x,
+            y: player.y,
+            radius: 5,
+            vy: -BULLET_SPEED,
+            vx: 0,
+            ownerIndex: player.index,
+            owner: player.id,
+            type: "PLAYER"
+          })
+          player.gunTemp += GUN_TEMP_PER_SHOT;
+        }
         game.events.push({
           type: "FIRE",
           who: player.playerId
         })
         player.lastFire = Rune.gameTime();
-        player.gunTemp += GUN_TEMP_PER_SHOT;
+        if (player.gunTemp > 1) {
+          player.gunTemp = 1;
+        }
       }
 
       if (!player.controls.fire) {
@@ -457,16 +605,19 @@ Rune.initLogic({
       }
     }
 
-    if (Rune.gameTime() - game.lastRock > getPhase(game).rockInterval) {
-      game.rocks.push({
-        id: game.nextId++,
-        x: Math.random() * VIEW_WIDTH,
-        y: 0,
-        r: Math.random() * Math.PI * 2,
-        vy: ((Math.random() * 5) + 2) * SPEED_SCALE,
-        radius: 50
-      })
-      game.lastRock = Rune.gameTime();
+    for (const powerUp of [...game.powerUps]) {
+      powerUp.y += POWER_UP_DRIFT_SPEED;
+      if (powerUp.y > VIEW_HEIGHT) {
+        game.powerUps.splice(game.powerUps.indexOf(powerUp), 1);
+      } else {
+        for (const player of [...game.players]) {
+          if (collide(player, powerUp)) {
+            game.powerUps.splice(game.powerUps.indexOf(powerUp), 1);
+            collectPowerUp(game, player, powerUp);
+            break;
+          }
+        }
+      }
     }
 
     for (const bullet of [...game.bullets]) {
@@ -505,6 +656,28 @@ Rune.initLogic({
       }
     }
 
+    // can move the ship at phase start
+    if (game.phaseStart > Rune.gameTime()) {
+      return;
+    }
+
+
+    if (Rune.gameTime() - context.game.lastEnemy > getPhase(game).enemyInterval) {
+      context.game.lastEnemy = Rune.gameTime() - spawnEnemy(context.game);
+    }
+
+    if (Rune.gameTime() - game.lastRock > getPhase(game).rockInterval) {
+      game.rocks.push({
+        id: game.nextId++,
+        x: Math.random() * VIEW_WIDTH,
+        y: 0,
+        r: Math.random() * Math.PI * 2,
+        vy: ((Math.random() * 5) + 2) * SPEED_SCALE,
+        radius: 50
+      })
+      game.lastRock = Rune.gameTime();
+    }
+
     for (const enemy of [...game.enemies]) {
       for (const bullet of game.bullets.filter(b => b.type === "PLAYER")) {
         if (collide(bullet, enemy)) {
@@ -525,7 +698,7 @@ Rune.initLogic({
       if (enemy.shoot) {
         if (enemy.waitUntil - Rune.gameTime() < 500 && enemy.needsShoot) {
           enemy.needsShoot = false;
-          bulletSpray(game, enemy, 8 + Math.floor(Math.random() * 4));
+          bulletSpray(game, enemy, 4 + Math.min(4, Math.floor(game.phase / 3)) + Math.floor(Math.random() * 4));
         }
       }
 
