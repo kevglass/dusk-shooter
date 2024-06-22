@@ -407,7 +407,7 @@ function collectPowerUp(game: GameState, player: Player, powerUp: PowerUp): void
 
 function spawnPowerUp(game: GameState, target: GameElement): void {
   // only spawn 1 in 3
-  if (Math.random() > 0.3) {
+  if (Math.random() > (game.phase < 3 ? 0.8 : game.phase < 10 ? 0.5 : 0.3)) {
     return;
   }
 
