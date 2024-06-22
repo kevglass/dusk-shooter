@@ -254,7 +254,7 @@ export class PewPew implements graphics.Game {
   }
 
   isLocalPlayer(game: GameElement): boolean {
-    return (game as any).playerId === this.localPlayerId;
+    return (game as unknown as { playerId: string }).playerId === this.localPlayerId;
   }
 
   updateInterpolators(game: GameElement[], futureGame: GameElement[], maxSpeed: number): void {
@@ -324,7 +324,7 @@ export class PewPew implements graphics.Game {
     elements.forEach(e => keyedElements[e.id] = e);
 
     for (const idString of Object.keys(this.interpolators)) {
-      const id = idString as any as number;
+      const id = (idString as unknown) as number;
       if (!keyedElements[id]) {
         delete this.interpolators[id];
         delete this.interpolatorAngles[id];

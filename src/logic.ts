@@ -505,7 +505,7 @@ export function getPhase(game: GameState): Phase {
 Rune.initLogic({
   minPlayers: 1,
   maxPlayers: 4,
-  setup: (allPlayerIds) => {
+  setup: () => {
     const state: GameState = {
       events: [],
       particles: [],
@@ -766,7 +766,7 @@ Rune.initLogic({
   },
   persistPlayerData: true,
   events: {
-    playerJoined: (id, context) => {
+    playerJoined: () => {
     },
     playerLeft: (id, context) => {
       context.game.players = context.game.players.filter((p) => p.playerId !== id)

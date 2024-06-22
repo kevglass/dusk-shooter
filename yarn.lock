@@ -583,6 +583,16 @@ escape-string-regexp@^4.0.0:
   resolved "https://registry.npmjs.org/escape-string-regexp/-/escape-string-regexp-4.0.0.tgz"
   integrity sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==
 
+eslint-plugin-react-hooks@^4.6.2:
+  version "4.6.2"
+  resolved "https://registry.npmjs.org/eslint-plugin-react-hooks/-/eslint-plugin-react-hooks-4.6.2.tgz"
+  integrity sha512-QzliNJq4GinDBcD8gPB5v0wh6g8q3SUi6EFF0x8N/BL9PoVs0atuGc47ozMRyOWAKdwaZ5OnbOEa3WR+dSGKuQ==
+
+eslint-plugin-react-refresh@^0.4.7:
+  version "0.4.7"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-react-refresh/-/eslint-plugin-react-refresh-0.4.7.tgz#1f597f9093b254f10ee0961c139a749acb19af7d"
+  integrity sha512-yrj+KInFmwuQS2UQcg1SF83ha1tuHC1jMQbRNyuWtlEzzKRDgAl7L4Yp4NlDUZTZNlWvHEzOtJhMi40R7JxcSw==
+
 eslint-plugin-rune@^0.2.0:
   version "0.2.2"
   resolved "https://registry.npmjs.org/eslint-plugin-rune/-/eslint-plugin-rune-0.2.2.tgz"
@@ -1136,7 +1146,7 @@ run-parallel@^1.1.9:
 
 rune-games-sdk@4.19.17:
   version "4.19.17"
-  resolved "https://registry.yarnpkg.com/rune-games-sdk/-/rune-games-sdk-4.19.17.tgz#b7638b5686851f244f8a2d1f65639307a5755d4b"
+  resolved "https://registry.npmjs.org/rune-games-sdk/-/rune-games-sdk-4.19.17.tgz"
   integrity sha512-SKiW/7QBQbpmQMHk/upiJrYLZiTHvjj/5XgIqEOKntVXio0Ic56/oNErmntOzDmIePHCyzgmg7Rea1cosGu1Fg==
 
 semver@^7.6.0:
