@@ -1,4 +1,4 @@
-import type { RuneClient } from "rune-games-sdk/multiplayer"
+import type { PlayerId, RuneClient } from "rune-games-sdk/multiplayer"
 
 // change this to generate a different game
 export const LEVELS_SEED = 1
@@ -50,6 +50,11 @@ for (let x = 0; x < 3; x++) {
       y: (VIEW_HEIGHT * 0.1) + (y * VIEW_HEIGHT * 0.15)
     })
   }
+}
+
+export type Persisted = {
+  bestPhase: number,
+  bestScore: number,
 }
 
 entryPoints.push({ x: -50, y: -50 });
@@ -179,6 +184,7 @@ export type GameEvent = {
 }
 
 export interface GameState {
+  persisted?: Record<PlayerId, Persisted>;
   events: GameEvent[];
   particles: Particle[];
   bullets: Bullet[];
@@ -203,7 +209,7 @@ export type GameActions = {
 }
 
 declare global {
-  const Rune: RuneClient<GameState, GameActions>
+  const Rune: RuneClient<GameState, GameActions, Persisted>
 }
 
 function collide(a: GameElement, b: GameElement): boolean {
@@ -541,6 +547,11 @@ Rune.initLogic({
     }
 
     for (const player of game.players) {
+      if (!game.persisted[player.playerId].bestScore || game.persisted[player.playerId].bestScore < player.score) {
+        game.persisted[player.playerId].bestScore = player.score;
+        game.persisted[player.playerId].bestPhase = game.phase;
+      }
+
       player.x += player.controls.x * MOVE_SPEED * player.moveModifier;
       player.y += player.controls.y * MOVE_SPEED * player.moveModifier;
 
@@ -753,6 +764,7 @@ Rune.initLogic({
 
     }
   },
+  persistPlayerData: true,
   events: {
     playerJoined: (id, context) => {
     },

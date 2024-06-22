@@ -1,7 +1,7 @@
 import { graphics, sound } from "toglib";
 import { ASSETS } from "./lib/assets";
 import { Interpolator, OnChangeParams } from "rune-games-sdk";
-import { BULLET_SPEED, Controls, ENEMY_MOVE_SPEED, EnemyColor, EnemyColors as enemyColors, GameActions, GameElement, GameState, getPhase, MOVE_SPEED, PARTICLE_SPEED, ParticleType, POWER_UP_DRIFT_SPEED, PowerUpType, ROCK_MAX_SPEED, VIEW_HEIGHT, VIEW_WIDTH } from "./logic";
+import { BULLET_SPEED, Controls, ENEMY_MOVE_SPEED, EnemyColor, EnemyColors as enemyColors, GameActions, GameElement, GameState, getPhase, MOVE_SPEED, PARTICLE_SPEED, ParticleType, Persisted, POWER_UP_DRIFT_SPEED, PowerUpType, ROCK_MAX_SPEED, VIEW_HEIGHT, VIEW_WIDTH } from "./logic";
 import nipplejs, { JoystickManager } from "nipplejs";
 
 const playerCols = ["blue", "green", "orange", "red"];
@@ -286,7 +286,7 @@ export class PewPew implements graphics.Game {
     }
   }
 
-  gameUpdate(update: OnChangeParams<GameState, GameActions>): void {
+  gameUpdate(update: OnChangeParams<GameState, GameActions, Persisted>): void {
     this.currentGame = update.game;
     if (update.yourPlayerId) {
       this.localPlayerId = update.yourPlayerId;
@@ -447,6 +447,16 @@ export class PewPew implements graphics.Game {
           msg = "Tap to Join The Battle".toUpperCase();
         }
         graphics.drawText(Math.floor((graphics.width() - graphics.textWidth(msg, this.font)) / 2), 300 + (Math.sin(Date.now() * 0.005) * 20), msg, this.font, col);
+
+        const bestRun = this.currentGame.persisted?.[this.localPlayerId];
+        if (bestRun) {
+          if (bestRun.bestPhase) {
+            msg = "BEST RUN";
+            graphics.drawText(Math.floor((graphics.width() - graphics.textWidth(msg, this.font)) / 2), 380, msg, this.font, col);
+            msg = "PHASE " + (bestRun.bestPhase+"").padStart(3, "0") + "         " + (bestRun.bestScore+"").padStart(10, "0");
+            graphics.drawText(Math.floor((graphics.width() - graphics.textWidth(msg, this.font)) / 2), 400, msg, this.font);
+          }
+        }
       } else {
         if (Rune.gameTime() < this.currentGame.phaseStart) {
           let msg = "Phase " + this.currentGame.phase;
