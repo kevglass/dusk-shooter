@@ -49,8 +49,13 @@
       width: 12%;
       position: absolute;
       right: 15%;
-      bottom: 10%;
+      bottom: 5%;
       opacity: 0.5;
+      height: 12%;
+    }
+
+    #fire img {
+      width: 100%;
     }
 
     #fire:active {
@@ -61,8 +66,8 @@
 
 <body>
   <canvas id="gamecanvas"></canvas>
+  <div id="fire"><img src="src/assets/fire.png"></div>
   <div id="joystick"></div>
-  <img id="fire" src="/src/assets/fire.png"></img>
   <script type="module" src="/src/logic.ts"></script>
   <script type="module" src="/src/client.ts"></script>
 </body>

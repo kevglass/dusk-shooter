@@ -91,13 +91,22 @@ export class PewPew implements graphics.Game {
       this.stick = { x: 0, y: 0 };
       this.updateControls();
     });
-    document.getElementById("fire")!.addEventListener("touchstart", () => {
-      document.getElementById("fire")!.style.opacity = "1";
+
+    (document.getElementById("fire") as HTMLImageElement).addEventListener("mousedown", () => {
+      this.fire = true;
+      this.updateControls(true);
+    })
+
+    document.getElementById("fire")!.addEventListener("mouseup", () => {
+      this.fire = false;
+      this.updateControls();
+    });
+
+    (document.getElementById("fire") as HTMLImageElement).addEventListener("touchstart", () => {
       this.fire = true;
       this.updateControls(true);
     })
     document.getElementById("fire")!.addEventListener("touchend", () => {
-      document.getElementById("fire")!.style.opacity = "0.5";
       this.fire = false;
       this.updateControls();
     })
