@@ -220,14 +220,14 @@ function collide(a: GameElement, b: GameElement): boolean {
   return ((dx * dx) + (dy * dy)) < (rad * rad);
 }
 
-function addPlayer(state: GameState, id: string) {
+function addPlayer(allPlayerIds: PlayerId[], state: GameState, id: string) {
   const index = state.nextPlayerIndex++;
   state.players.push({
     playerId: id,
     id: state.nextId++,
     x: 200 + (index * 125),
     y: VIEW_HEIGHT - 400,
-    index,
+    index: allPlayerIds.indexOf(id),
     health: 3,
     controls: { x: 0, y: 0, fire: false },
     lastFire: 0,
@@ -759,7 +759,7 @@ Rune.initLogic({
 
       if (!context.game.players.find(p => p.playerId === context.playerId)) {
 
-        addPlayer(context.game, context.playerId)
+        addPlayer(context.allPlayerIds, context.game, context.playerId)
       }
 
     }

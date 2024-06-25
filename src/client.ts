@@ -413,7 +413,7 @@ export class PewPew implements graphics.Game {
       }
       for (const bullet of this.currentGame.bullets) {
         const location = this.getElementLocation(bullet);
-        const image = bullet.type === "PLAYER" ? this.playerBullets[bullet.ownerIndex] : this.enemyBullet;
+        const image = bullet.type === "PLAYER" ? this.playerBullets[bullet.ownerIndex % this.playerBullets.length] : this.enemyBullet;
         graphics.drawImage(image, location.x - (image.width / 2), location.y - (image.height / 2));
       }
       for (const powerUp of this.currentGame.powerUps) {
@@ -424,7 +424,7 @@ export class PewPew implements graphics.Game {
       for (const player of this.currentGame.players) {
         const location = this.getElementLocation(player);
         const lastHit = Rune.gameTime() - player.lastHit;
-        const image = this.playerShips[player.index];
+        const image = this.playerShips[player.index % this.playerShips.length];
         if (lastHit < 3000 && Math.floor(lastHit / 200) % 2 == 0) {
           graphics.drawImage(image, location.x - (image.width / 2), location.y - (image.height / 2), image.width, image.height, "red");
         } else {
@@ -482,12 +482,12 @@ export class PewPew implements graphics.Game {
         // HUD
         const localPlayer = this.currentGame.players.find(p => p.playerId === this.localPlayerId);
         if (localPlayer) {
-          graphics.drawImage(this.tinyShips[localPlayer.index], 0, 0);
+          graphics.drawImage(this.tinyShips[localPlayer.index % this.tinyShips.length], 0, 0);
           for (let i = 0; i < localPlayer.maxHealth; i++) {
             graphics.fillRect(35 + (i * 20), 2, 18, 10, "white")
             graphics.fillRect(35 + (i * 20) + 1, 3, 16, 8, "black")
             if (i < localPlayer.health) {
-              graphics.fillRect(35 + (i * 20) + 1, 3, 16, 8, this.cols[localPlayer.index])
+              graphics.fillRect(35 + (i * 20) + 1, 3, 16, 8, this.cols[localPlayer.index % this.cols.length])
             }
           }
           graphics.fillRect(35, 14, localPlayer.gunTemp * 60, 5, localPlayer.gunTemp >= 0.9 ? "red" : "orange");
@@ -500,9 +500,9 @@ export class PewPew implements graphics.Game {
             if (p === localPlayer) {
               continue;
             }
-            graphics.drawImage(this.tinyShips[p.index], graphics.width() - 17, index * 15, 17, 13);
+            graphics.drawImage(this.tinyShips[p.index % this.tinyShips.length], graphics.width() - 17, index * 15, 17, 13);
             for (let i = 0; i < p.health; i++) {
-              graphics.fillRect(graphics.width() - 29 - (i * 12), 4 + (index * 15), 10, 6, this.cols[p.index])
+              graphics.fillRect(graphics.width() - 29 - (i * 12), 4 + (index * 15), 10, 6, this.cols[p.index % this.cols.length])
             }
             index++;
           }
