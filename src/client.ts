@@ -23,6 +23,8 @@ type Star = {
   vy: number
 }
 
+const touchDevice = ('ontouchstart' in document.documentElement);
+
 export class PewPew implements graphics.Game {
   cols: string[] = ["#36bbf5", "#6fc834", "#ca4b26", "#ac3939"];
   tinyShips: graphics.GameImage[] = [];
@@ -92,24 +94,27 @@ export class PewPew implements graphics.Game {
       this.updateControls();
     });
 
-    (document.getElementById("fire") as HTMLImageElement).addEventListener("mousedown", () => {
-      this.fire = true;
-      this.updateControls(true);
-    })
+    if (!touchDevice) {
+      (document.getElementById("fire") as HTMLImageElement).addEventListener("mousedown", () => {
+        this.fire = true;
+        this.updateControls(true);
+      })
 
-    document.getElementById("fire")!.addEventListener("mouseup", () => {
-      this.fire = false;
-      this.updateControls();
-    });
+      document.getElementById("fire")!.addEventListener("mouseup", () => {
+        this.fire = false;
+        this.updateControls();
+      });
+    } else {
 
-    (document.getElementById("fire") as HTMLImageElement).addEventListener("touchstart", () => {
-      this.fire = true;
-      this.updateControls(true);
-    })
-    document.getElementById("fire")!.addEventListener("touchend", () => {
-      this.fire = false;
-      this.updateControls();
-    })
+      (document.getElementById("fire") as HTMLImageElement).addEventListener("touchstart", () => {
+        this.fire = true;
+        this.updateControls(true);
+      })
+      document.getElementById("fire")!.addEventListener("touchend", () => {
+        this.fire = false;
+        this.updateControls();
+      })
+    }
 
     setInterval(() => {
       this.updateControls();
@@ -462,7 +467,7 @@ export class PewPew implements graphics.Game {
           if (bestRun.bestPhase) {
             msg = "BEST RUN";
             graphics.drawText(Math.floor((graphics.width() - graphics.textWidth(msg, this.font)) / 2), 380, msg, this.font, col);
-            msg = "PHASE " + (bestRun.bestPhase+"").padStart(3, "0") + "         " + (bestRun.bestScore+"").padStart(10, "0");
+            msg = "PHASE " + (bestRun.bestPhase + "").padStart(3, "0") + "         " + (bestRun.bestScore + "").padStart(10, "0");
             graphics.drawText(Math.floor((graphics.width() - graphics.textWidth(msg, this.font)) / 2), 400, msg, this.font);
           }
         }
