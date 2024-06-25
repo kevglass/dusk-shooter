@@ -278,10 +278,9 @@ export class PewPew implements graphics.Game {
           this.interpolators[element.id] = Rune.interpolator<number[]>();
           this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
         } else {
-          const latency = Rune.interpolatorLatency<number[]>({ maxSpeed });
+          const latency = Rune.interpolatorLatency<number[]>({ maxSpeed: maxSpeed * 2 });
           this.interpolators[element.id] = latency
           this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
-          latency.jump([element.x, element.y]);
         }
       }
       const futureElement = futureGame.find(e => e.id === element.id);
@@ -293,7 +292,6 @@ export class PewPew implements graphics.Game {
         } else {
           this.interpolatorAngles[element.id] = Math.atan2(dy, dx)
         }
-        // this.interpolatorAngles[element.id] = Math.atan2(-1, -5)
 
         this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [futureElement.x, futureElement.y] })
       }
