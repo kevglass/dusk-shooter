@@ -271,15 +271,15 @@ export class PewPew implements graphics.Game {
     return (game as unknown as { playerId: string }).playerId === this.localPlayerId;
   }
 
-  updateInterpolators(game: GameElement[], futureGame: GameElement[], maxSpeed: number): void {
+  updateInterpolators(game: GameElement[], futureGame: GameElement[], maxSpeed: number, allowLatency: boolean = false): void {
     for (const element of game) {
       if (!this.interpolators[element.id]) {
-        if (this.isLocalPlayer(element)) {
-          this.interpolators[element.id] = Dusk.interpolator<number[]>();
+        if (!this.isLocalPlayer(element) && allowLatency) {
+          const latency = Dusk.interpolatorLatency<number[]>({ maxSpeed: maxSpeed, timeToMaxSpeed: 50 });
+          this.interpolators[element.id] = latency
           this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
         } else {
-          const latency = Dusk.interpolatorLatency<number[]>({ maxSpeed: maxSpeed * 2 });
-          this.interpolators[element.id] = latency
+          this.interpolators[element.id] = Dusk.interpolator<number[]>();
           this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
         }
       }
@@ -322,11 +322,11 @@ export class PewPew implements graphics.Game {
       }
     }
 
-    if (update.futureGame) {
+    if (update.futureGame && (update.event?.name === "update" || update.event?.name === "stateSync")) {
       this.updateInterpolators(update.game.rocks, update.futureGame.rocks, ROCK_MAX_SPEED);
       this.updateInterpolators(update.game.bullets, update.futureGame.bullets, BULLET_SPEED);
       this.updateInterpolators(update.game.particles, update.futureGame.particles, PARTICLE_SPEED);
-      this.updateInterpolators(update.game.players, update.futureGame.players, MOVE_SPEED);
+      this.updateInterpolators(update.game.players, update.futureGame.players, MOVE_SPEED, true);
       this.updateInterpolators(update.game.enemies, update.futureGame.enemies, ENEMY_MOVE_SPEED * getPhase(update.game).speedModifier);
       this.updateInterpolators(update.game.powerUps, update.futureGame.powerUps, POWER_UP_DRIFT_SPEED);
     }
