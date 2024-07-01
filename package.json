@@ -8,7 +8,7 @@
     "build": "npm run lint && tsc && vite build",
     "upload": "npm run build && npx dusk-cli@latest upload",
     "lint": "eslint src --ext ts,tsx",
-    "deploy": "npm run build && rune upload --name 'Star Chaser'",
+    "deploy": "npm run build && dusk upload --name 'Star Chaser'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
