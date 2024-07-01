@@ -1,6 +1,6 @@
 import { graphics, sound } from "toglib";
 import { ASSETS } from "./lib/assets";
-import { Interpolator, OnChangeParams } from "rune-games-sdk";
+import { Interpolator, OnChangeParams } from "dusk-games-sdk";
 import { BULLET_SPEED, Controls, ENEMY_MOVE_SPEED, EnemyColor, EnemyColors as enemyColors, GameActions, GameElement, GameState, getPhase, MOVE_SPEED, PARTICLE_SPEED, ParticleType, Persisted, POWER_UP_DRIFT_SPEED, PowerUpType, ROCK_MAX_SPEED, VIEW_HEIGHT, VIEW_WIDTH } from "./logic";
 import nipplejs, { JoystickManager } from "nipplejs";
 
@@ -216,7 +216,7 @@ export class PewPew implements graphics.Game {
           y = 1;
         }
         if (this.lastSentControls.x !== x || this.lastSentControls.y !== y || this.lastSentControls.fire !== this.fire) {
-          Rune.actions.controls({ x, y, fire: this.fire });
+          Dusk.actions.controls({ x, y, fire: this.fire });
           this.lastSentControlsTime = Date.now();
           this.lastSentControls.x = x;
           this.lastSentControls.y = y;
@@ -228,7 +228,7 @@ export class PewPew implements graphics.Game {
 
   mouseDown(): void {
     if (!this.inGame()) {
-      Rune.actions.join();
+      Dusk.actions.join();
     }
   }
 
@@ -275,10 +275,10 @@ export class PewPew implements graphics.Game {
     for (const element of game) {
       if (!this.interpolators[element.id]) {
         if (this.isLocalPlayer(element)) {
-          this.interpolators[element.id] = Rune.interpolator<number[]>();
+          this.interpolators[element.id] = Dusk.interpolator<number[]>();
           this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
         } else {
-          const latency = Rune.interpolatorLatency<number[]>({ maxSpeed: maxSpeed * 2 });
+          const latency = Dusk.interpolatorLatency<number[]>({ maxSpeed: maxSpeed * 2 });
           this.interpolators[element.id] = latency
           this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
         }
@@ -347,7 +347,7 @@ export class PewPew implements graphics.Game {
   resourcesLoaded(): void {
     // initialise the Rune SDK and register the callback to get
     // game updates
-    Rune.initClient({
+    Dusk.initClient({
       onChange: (update) => {
         this.gameUpdate(update);
       },
@@ -411,7 +411,7 @@ export class PewPew implements graphics.Game {
       }
       for (const enemy of this.currentGame.enemies) {
         const location = this.getElementLocation(enemy);
-        const lastHit = Rune.gameTime() - enemy.lastHit;
+        const lastHit = Dusk.gameTime() - enemy.lastHit;
         const image = this.enemyShips[enemy.col][enemy.index];
         graphics.push();
         graphics.rotate((this.interpolatorAngles[enemy.id] ?? 0) - (Math.PI / 2));
@@ -435,7 +435,7 @@ export class PewPew implements graphics.Game {
       }
       for (const player of this.currentGame.players) {
         const location = this.getElementLocation(player);
-        const lastHit = Rune.gameTime() - player.lastHit;
+        const lastHit = Dusk.gameTime() - player.lastHit;
         const image = this.playerShips[player.index % this.playerShips.length];
         if (lastHit < 3000 && Math.floor(lastHit / 200) % 2 == 0) {
           graphics.drawImage(image, location.x - (image.width / 2), location.y - (image.height / 2), image.width, image.height, "red");
@@ -470,7 +470,7 @@ export class PewPew implements graphics.Game {
           }
         }
       } else {
-        if (Rune.gameTime() < this.currentGame.phaseStart) {
+        if (Dusk.gameTime() < this.currentGame.phaseStart) {
           let msg = "Phase " + this.currentGame.phase;
           graphics.drawText(Math.floor((graphics.width() - graphics.textWidth(msg, this.bigFont)) / 2), 300, msg, this.bigFont);
           msg = this.currentGame.phaseInfo.msg;
