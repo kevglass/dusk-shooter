@@ -221,13 +221,15 @@ function collide(a: GameElement, b: GameElement): boolean {
 }
 
 function addPlayer(allPlayerIds: PlayerId[], state: GameState, id: string) {
+  const allShipInds: number[] = [0,1,2,3].filter(i => !state.players.find(p => p.index === i));
+
   const index = state.nextPlayerIndex++;
   state.players.push({
     playerId: id,
     id: state.nextId++,
     x: 200 + (index * 125),
     y: VIEW_HEIGHT - 400,
-    index: allPlayerIds.indexOf(id),
+    index: allShipInds[Math.floor(Math.random() * allShipInds.length)],
     health: 3,
     controls: { x: 0, y: 0, fire: false },
     lastFire: 0,

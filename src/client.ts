@@ -76,7 +76,7 @@ export class PewPew implements graphics.Game {
 
     this.bigFont = graphics.generateFont(30, "white");
     this.font = graphics.generateFont(16, "white");
-    this.scoreFont = graphics.generateFont(14, "white");
+    this.scoreFont = graphics.generateFont(16, "white");
 
     const joystick: JoystickManager = nipplejs.create({
       mode: "static",
@@ -505,7 +505,7 @@ export class PewPew implements graphics.Game {
           graphics.fillRect(35, 14, localPlayer.gunTemp * 60, 5, localPlayer.gunTemp >= 0.9 ? "red" : "orange");
 
           const score = ("" + localPlayer.score).padStart(10, "0");
-          graphics.drawText(Math.floor((graphics.width() - graphics.textWidth(score, this.scoreFont)) / 2), 15, score, this.scoreFont);
+          graphics.drawText(Math.floor((graphics.width() - graphics.textWidth(score, this.scoreFont)) / 2), 30, score, this.scoreFont);
 
           let index = 0;
           for (const p of this.currentGame.players) {
