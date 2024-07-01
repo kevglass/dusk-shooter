@@ -428,7 +428,11 @@ function spawnPowerUp(game: GameState, target: GameElement): void {
   })
 }
 
-function damageEnemy(game: GameState, enemy: Enemy, remove?: Bullet): void {
+function damageEnemy(game: GameState, enemy: Enemy, remove?: Bullet): boolean {
+  if (!game.enemies.includes(enemy)) {
+    return false;
+  }
+  
   enemy.health--;
   if (remove) {
     game.bullets.splice(game.bullets.indexOf(remove), 1);
@@ -461,7 +465,11 @@ function damageEnemy(game: GameState, enemy: Enemy, remove?: Bullet): void {
     game.events.push({
       type: "EXPLODE"
     })
+
+    return true;
   }
+
+  return false;
 }
 
 function explodeRock(game: GameState, rock: Rock, remove?: Bullet): void {
@@ -532,7 +540,6 @@ Dusk.initLogic({
   updatesPerSecond: 30,
   reactive: false,
   update: (context) => {
-    // const game: GameState = JSON.parse(JSON.stringify(context.game));
     const game = context.game;
     game.events = [];
 
@@ -660,12 +667,14 @@ Dusk.initLogic({
       for (const bullet of game.bullets.filter(b => b.type === "PLAYER")) {
         if (collide(bullet, rock)) {
           explodeRock(game, rock, bullet);
+          continue;
         }
       }
       for (const player of [...game.players]) {
         if (collide(player, rock)) {
           explodeRock(game, rock);
           takeDamage(game, player);
+          continue;
         }
       }
     }
@@ -693,20 +702,36 @@ Dusk.initLogic({
     }
 
     for (const enemy of [...game.enemies]) {
+      let done = false;
+
       for (const bullet of game.bullets.filter(b => b.type === "PLAYER")) {
         if (collide(bullet, enemy)) {
-          damageEnemy(game, enemy, bullet);
-          continue;
+          if (damageEnemy(game, enemy, bullet)) {
+            done = true;
+            break;
+          }
         }
       }
+
+      if (done) {
+        continue;
+      }
+      
       const lastHit = Dusk.gameTime() - enemy.lastHit;
       if (lastHit > 3000) {
         for (const player of [...game.players]) {
           if (collide(enemy, player)) {
-            damageEnemy(game, enemy);
             takeDamage(game, player);
+            if (damageEnemy(game, enemy)) {
+              done = true;
+              break;
+            }
           }
         }
+      }
+
+      if (done) {
+        continue;
       }
 
       if (enemy.shoot) {
@@ -719,25 +744,25 @@ Dusk.initLogic({
       /// enemy move if not waiting
       if (enemy.waitUntil < Dusk.gameTime()) {
         const dx = enemy.path[enemy.pt].x - enemy.path[enemy.pt - 1].x;
-        const dy = enemy.path[enemy.pt].x - enemy.path[enemy.pt - 1].x;
+        const dy = enemy.path[enemy.pt].y - enemy.path[enemy.pt - 1].y;
         const len = Math.sqrt((dx * dx) + (dy * dy));
-        enemy.pos += enemy.speed / len
-        if (enemy.pos > 1) {
-          enemy.pos = 1;
-        }
 
         if (len > 0) {
+          enemy.pos += enemy.speed / len
+          if (enemy.pos > 1) {
+            enemy.pos = 1;
+          }
           enemy.x = ((1 - enemy.pos) * enemy.path[enemy.pt - 1].x) + (enemy.pos * enemy.path[enemy.pt].x) + (Math.sin(Math.PI * enemy.pos) * (dy / len) * 100)
           enemy.y = ((1 - enemy.pos) * enemy.path[enemy.pt - 1].y) + (enemy.pos * enemy.path[enemy.pt].y) + (Math.sin(Math.PI * enemy.pos) * (dx / len) * 100)
         }
-        if (enemy.pos >= 1 || len === 0) {
+        if (enemy.pos >= 1 || len == 0) {
           enemy.waitUntil = Dusk.gameTime() + enemy.path[enemy.pt].wait;
           enemy.needsShoot = true;
           enemy.pt++;
           enemy.pos = 0;
 
           // reached end of the path
-          if (!enemy.path[enemy.pt]) {
+          if (!enemy.path[enemy.pt] && game.enemies.includes(enemy)) {
             game.enemies.splice(game.enemies.indexOf(enemy), 1);
           }
         }
