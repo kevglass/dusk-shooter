@@ -322,7 +322,7 @@ export class PewPew implements graphics.Game {
       }
     }
 
-    if (update.futureGame && (update.event?.name === "update" || update.event?.name === "stateSync")) {
+    if (update.futureGame) {
       this.updateInterpolators(update.game.rocks, update.futureGame.rocks, ROCK_MAX_SPEED);
       this.updateInterpolators(update.game.bullets, update.futureGame.bullets, BULLET_SPEED);
       this.updateInterpolators(update.game.particles, update.futureGame.particles, PARTICLE_SPEED);
