@@ -544,10 +544,10 @@ doctrine@^3.0.0:
   dependencies:
     esutils "^2.0.2"
 
-dusk-games-sdk@4.20.0-snapshot.440:
-  version "4.20.0-snapshot.440"
-  resolved "https://registry.yarnpkg.com/dusk-games-sdk/-/dusk-games-sdk-4.20.0-snapshot.440.tgz#947a76eedb011487157652512f63b786f59e1f0a"
-  integrity sha512-zfIEQx8US/IBjQuJeZ18bazncCn54cuDQHG+U+WV+CyuXtTlyb6usiXVsz80smx/JaquaHZc2HeCTJ83zkFTBw==
+dusk-games-sdk@4.20.2-snapshot.442:
+  version "4.20.2-snapshot.442"
+  resolved "https://registry.yarnpkg.com/dusk-games-sdk/-/dusk-games-sdk-4.20.2-snapshot.442.tgz#b9132cd08f0a508c47f276fde7d10fd5da8668c9"
+  integrity sha512-UslUgE0aEV6eU+BaCmDLxJKqZ81iqm4pXvcainWS37l/3aI/lSa9kxg9gktqYwooPMAWffc0Vlqk3bkWqtPfrA==
 
 es-module-lexer@^1.4.2:
   version "1.5.3"

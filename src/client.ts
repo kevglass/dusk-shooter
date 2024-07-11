@@ -262,9 +262,9 @@ export class PewPew implements graphics.Game {
     const lerp = this.interpolators[element.id];
     if (lerp) {
       const pos = lerp.getPosition();
-      return { x: pos[0], y: pos[1] };
+      return { x: Math.floor(pos[0]), y: Math.floor(pos[1]) };
     }
-    return { x: element.x, y: element.y };
+    return { x: Math.floor(element.x), y: Math.floor(element.y) };
   }
 
   isLocalPlayer(game: GameElement): boolean {
@@ -322,7 +322,7 @@ export class PewPew implements graphics.Game {
       }
     }
 
-    if (update.futureGame) {
+    if (update.futureGame && (update.event?.name === "update" || update.event?.name === "stateSync")) {
       this.updateInterpolators(update.game.rocks, update.futureGame.rocks, ROCK_MAX_SPEED);
       this.updateInterpolators(update.game.bullets, update.futureGame.bullets, BULLET_SPEED);
       this.updateInterpolators(update.game.particles, update.futureGame.particles, PARTICLE_SPEED);
