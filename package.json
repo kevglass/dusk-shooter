@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "dusk-games-sdk": "4.20.2-snapshot.442",
+    "dusk-games-sdk": "^4.21.9",
     "eslint-plugin-react-refresh": "^0.4.7",
     "nipplejs": "^0.10.2",
     "toglib": "^1.1.3"
