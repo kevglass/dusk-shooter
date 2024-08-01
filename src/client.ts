@@ -97,6 +97,9 @@ export class PewPew implements graphics.Game {
     if (!touchDevice) {
       (document.getElementById("fire") as HTMLImageElement).addEventListener("mousedown", () => {
         this.fire = true;
+        if (!this.inGame()) {
+          Dusk.actions.join();
+        }
         this.updateControls(true);
       })
 
@@ -108,6 +111,9 @@ export class PewPew implements graphics.Game {
 
       (document.getElementById("fire") as HTMLImageElement).addEventListener("touchstart", () => {
         this.fire = true;
+        if (!this.inGame()) {
+          Dusk.actions.join();
+        }
         this.updateControls(true);
       })
       document.getElementById("fire")!.addEventListener("touchend", () => {
@@ -264,6 +270,7 @@ export class PewPew implements graphics.Game {
       const pos = lerp.getPosition();
       return { x: Math.floor(pos[0]), y: Math.floor(pos[1]) };
     }
+
     return { x: Math.floor(element.x), y: Math.floor(element.y) };
   }
 
@@ -278,9 +285,11 @@ export class PewPew implements graphics.Game {
           const latency = Dusk.interpolatorLatency<number[]>({ maxSpeed: maxSpeed, timeToMaxSpeed: 50 });
           this.interpolators[element.id] = latency
           this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
-        } else {
+        } else if (!this.isLocalPlayer(element)) {
           this.interpolators[element.id] = Dusk.interpolator<number[]>();
           this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
+        } else {
+          continue;
         }
       }
       const futureElement = futureGame.find(e => e.id === element.id);
