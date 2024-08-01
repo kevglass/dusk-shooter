@@ -71,7 +71,7 @@ export class PewPew implements graphics.Game {
 
   localPlayerId: string = "";
   useLocalInterpolator: boolean = false;
-  
+
   constructor() {
     graphics.init(graphics.RendererType.WEBGL, false, undefined, 5);
 
@@ -286,7 +286,7 @@ export class PewPew implements graphics.Game {
           const latency = Dusk.interpolatorLatency<number[]>({ maxSpeed: maxSpeed, timeToMaxSpeed: 50 });
           this.interpolators[element.id] = latency
           this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
-        } else if (!this.isLocalPlayer(element) || useLocalInterpolator) {
+        } else if (!this.isLocalPlayer(element) || this.useLocalInterpolator) {
           this.interpolators[element.id] = Dusk.interpolator<number[]>();
           this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
         } else {
