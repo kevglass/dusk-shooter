@@ -1,6 +1,6 @@
 import { graphics, sound } from "toglib";
 import { ASSETS } from "./lib/assets";
-import { Interpolator, OnChangeParams } from "dusk-games-sdk";
+import { Interpolator, OnChangeParams } from "rune-sdk";
 import { BULLET_SPEED, Controls, ENEMY_MOVE_SPEED, EnemyColor, EnemyColors as enemyColors, GameActions, GameElement, GameState, getPhase, MOVE_SPEED, PARTICLE_SPEED, ParticleType, Persisted, POWER_UP_DRIFT_SPEED, PowerUpType, ROCK_MAX_SPEED, VIEW_HEIGHT, VIEW_WIDTH } from "./logic";
 import nipplejs, { JoystickManager } from "nipplejs";
 
@@ -71,6 +71,7 @@ export class PewPew implements graphics.Game {
 
   localPlayerId: string = "";
   useLocalInterpolator: boolean = false;
+  localPlayerPosition: { x: number, y: number } = { x: -1, y: -1 }
 
   constructor() {
     graphics.init(graphics.RendererType.WEBGL, false, undefined, 5);
@@ -99,7 +100,7 @@ export class PewPew implements graphics.Game {
       (document.getElementById("fire") as HTMLImageElement).addEventListener("mousedown", () => {
         this.fire = true;
         if (!this.inGame()) {
-          Dusk.actions.join();
+          Rune.actions.join();
         }
         this.updateControls(true);
       })
@@ -113,7 +114,7 @@ export class PewPew implements graphics.Game {
       (document.getElementById("fire") as HTMLImageElement).addEventListener("touchstart", () => {
         this.fire = true;
         if (!this.inGame()) {
-          Dusk.actions.join();
+          Rune.actions.join();
         }
         this.updateControls(true);
       })
@@ -223,7 +224,7 @@ export class PewPew implements graphics.Game {
           y = 1;
         }
         if (this.lastSentControls.x !== x || this.lastSentControls.y !== y || this.lastSentControls.fire !== this.fire) {
-          Dusk.actions.controls({ x, y, fire: this.fire });
+          Rune.actions.controls({ x, y, fire: this.fire });
           this.lastSentControlsTime = Date.now();
           this.lastSentControls.x = x;
           this.lastSentControls.y = y;
@@ -235,7 +236,7 @@ export class PewPew implements graphics.Game {
 
   mouseDown(): void {
     if (!this.inGame()) {
-      Dusk.actions.join();
+      Rune.actions.join();
     }
   }
 
@@ -272,7 +273,7 @@ export class PewPew implements graphics.Game {
       return { x: Math.floor(pos[0]), y: Math.floor(pos[1]) };
     }
 
-    return { x: Math.floor(element.x), y: Math.floor(element.y) };
+    return this.localPlayerPosition
   }
 
   isLocalPlayer(game: GameElement): boolean {
@@ -283,11 +284,11 @@ export class PewPew implements graphics.Game {
     for (const element of game) {
       if (!this.interpolators[element.id]) {
         if (!this.isLocalPlayer(element) && allowLatency) {
-          const latency = Dusk.interpolatorLatency<number[]>({ maxSpeed: maxSpeed, timeToMaxSpeed: 50 });
+          const latency = Rune.interpolatorLatency<number[]>({ maxSpeed: maxSpeed, timeToMaxSpeed: 50 });
           this.interpolators[element.id] = latency
           this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
         } else if (!this.isLocalPlayer(element) || this.useLocalInterpolator) {
-          this.interpolators[element.id] = Dusk.interpolator<number[]>();
+          this.interpolators[element.id] = Rune.interpolator<number[]>();
           this.interpolators[element.id].update({ game: [element.x, element.y], futureGame: [element.x, element.y] })
         } else {
           continue;
@@ -339,6 +340,12 @@ export class PewPew implements graphics.Game {
       this.updateInterpolators(update.game.players, update.futureGame.players, MOVE_SPEED, true);
       this.updateInterpolators(update.game.enemies, update.futureGame.enemies, ENEMY_MOVE_SPEED * getPhase(update.game).speedModifier);
       this.updateInterpolators(update.game.powerUps, update.futureGame.powerUps, POWER_UP_DRIFT_SPEED);
+
+      const localPlayer = update.game.players.find(p => p.playerId === update.yourPlayerId);
+      if (localPlayer) {
+        this.localPlayerPosition.x = localPlayer.x
+        this.localPlayerPosition.y = localPlayer.y
+      }
     }
 
     const elements = [...update.game.rocks, ...update.game.bullets, ...update.game.particles, ...update.game.players, ...update.game.enemies, ...update.game.powerUps];
@@ -357,7 +364,7 @@ export class PewPew implements graphics.Game {
   resourcesLoaded(): void {
     // initialise the Rune SDK and register the callback to get
     // game updates
-    Dusk.initClient({
+    Rune.initClient({
       onChange: (update) => {
         this.gameUpdate(update);
       },
@@ -421,7 +428,7 @@ export class PewPew implements graphics.Game {
       }
       for (const enemy of this.currentGame.enemies) {
         const location = this.getElementLocation(enemy);
-        const lastHit = Dusk.gameTime() - enemy.lastHit;
+        const lastHit = Rune.gameTime() - enemy.lastHit;
         const image = this.enemyShips[enemy.col][enemy.index];
         graphics.push();
         graphics.rotate((this.interpolatorAngles[enemy.id] ?? 0) - (Math.PI / 2));
@@ -445,7 +452,7 @@ export class PewPew implements graphics.Game {
       }
       for (const player of this.currentGame.players) {
         const location = this.getElementLocation(player);
-        const lastHit = Dusk.gameTime() - player.lastHit;
+        const lastHit = Rune.gameTime() - player.lastHit;
         const image = this.playerShips[player.index % this.playerShips.length];
         if (lastHit < 3000 && Math.floor(lastHit / 200) % 2 == 0) {
           graphics.drawImage(image, location.x - (image.width / 2), location.y - (image.height / 2), image.width, image.height, "red");
@@ -480,7 +487,7 @@ export class PewPew implements graphics.Game {
           }
         }
       } else {
-        if (Dusk.gameTime() < this.currentGame.phaseStart) {
+        if (Rune.gameTime() < this.currentGame.phaseStart) {
           let msg = "Phase " + this.currentGame.phase;
           graphics.drawText(Math.floor((graphics.width() - graphics.textWidth(msg, this.bigFont)) / 2), 300, msg, this.bigFont);
           msg = this.currentGame.phaseInfo.msg;

@@ -6,16 +6,16 @@
   "scripts": {
     "dev": "vite --host",
     "build": "npm run lint && tsc && vite build",
-    "upload": "npm run build && npx dusk-cli@latest upload",
+    "upload": "npm run build && npx rune-games-cli@latest upload",
     "lint": "eslint src --ext ts,tsx",
     "deploy": "npm run build && dusk upload --name 'Star Chaser'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "dusk-games-sdk": "^4.21.9",
     "eslint-plugin-react-refresh": "^0.4.7",
     "nipplejs": "^0.10.2",
-    "toglib": "^1.1.3"
+    "toglib": "^1.1.3",
+    "rune-sdk": "^4.22.1"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.8.0",

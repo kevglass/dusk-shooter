@@ -1,4 +1,4 @@
-import type { PlayerId, DuskClient } from "dusk-games-sdk"
+import type { PlayerId, RuneClient } from "rune-sdk"
 
 // change this to generate a different game
 export const LEVELS_SEED = 1
@@ -209,7 +209,7 @@ export type GameActions = {
 }
 
 declare global {
-  const Dusk: DuskClient<GameState, GameActions, Persisted>
+  const Rune: RuneClient<GameState, GameActions, Persisted>
 }
 
 function collide(a: GameElement, b: GameElement): boolean {
@@ -279,12 +279,12 @@ function createPhase(index: number): Phase {
 
 function startPhase(game: GameState): void {
   game.phase++;
-  game.phaseStart = Dusk.gameTime() + PHASE_START_TIME;
+  game.phaseStart = Rune.gameTime() + PHASE_START_TIME;
   game.phaseInfo = createPhase(game.phase);
 }
 
 function resetGame(game: GameState): void {
-  game.lastEnemy = Dusk.gameTime();
+  game.lastEnemy = Rune.gameTime();
   game.phase = 0;
   game.nextRandom = 0;
   game.enemies = [];
@@ -332,8 +332,8 @@ function spawnEnemy(game: GameState): number {
         y: startPoint.y,
         id: game.nextId++,
         radius: 70,
-        start: Dusk.gameTime(),
-        waitUntil: Dusk.gameTime() + (i * 500),
+        start: Rune.gameTime(),
+        waitUntil: Rune.gameTime() + (i * 500),
         index,
         col,
         pt: 1,
@@ -367,7 +367,7 @@ function spawnEnemy(game: GameState): number {
         y: startPoint.y,
         id: game.nextId++,
         radius: 70,
-        start: Dusk.gameTime(),
+        start: Rune.gameTime(),
         waitUntil: 0,
         index,
         col,
@@ -438,7 +438,7 @@ function damageEnemy(game: GameState, enemy: Enemy, remove?: Bullet): boolean {
     game.bullets.splice(game.bullets.indexOf(remove), 1);
   }
 
-  enemy.lastHit = Dusk.gameTime();
+  enemy.lastHit = Rune.gameTime();
 
   if (enemy.health <= 0) {
     if (remove) {
@@ -487,10 +487,10 @@ function explodeRock(game: GameState, rock: Rock, remove?: Bullet): void {
 }
 
 function takeDamage(game: GameState, player: Player) {
-  const lastHit = Dusk.gameTime() - player.lastHit;
+  const lastHit = Rune.gameTime() - player.lastHit;
   if (lastHit > 3000) {
     player.health--;
-    player.lastHit = Dusk.gameTime();
+    player.lastHit = Rune.gameTime();
 
     if (player.health <= 0) {
       game.players.splice(game.players.indexOf(player), 1);
@@ -512,7 +512,7 @@ export function getPhase(game: GameState): Phase {
   return game.phaseInfo;
 }
 
-Dusk.initLogic({
+Rune.initLogic({
   minPlayers: 1,
   maxPlayers: 4,
   setup: () => {
@@ -568,7 +568,7 @@ Dusk.initLogic({
       player.x = Math.min(Math.max(0, player.x), VIEW_WIDTH);
       player.y = Math.min(Math.max(0, player.y), VIEW_HEIGHT);
 
-      if (player.controls.fire && Dusk.gameTime() - player.lastFire > player.fireInterval * (player.gunTemp > 0.9 ? 2 : 1)) {
+      if (player.controls.fire && Rune.gameTime() - player.lastFire > player.fireInterval * (player.gunTemp > 0.9 ? 2 : 1)) {
         if (player.shots === 2) {
           game.bullets.push({
             id: game.nextId++,
@@ -612,7 +612,7 @@ Dusk.initLogic({
           type: "FIRE",
           who: player.playerId
         })
-        player.lastFire = Dusk.gameTime();
+        player.lastFire = Rune.gameTime();
         if (player.gunTemp > 1) {
           player.gunTemp = 1;
         }
@@ -680,16 +680,16 @@ Dusk.initLogic({
     }
 
     // can move the ship at phase start
-    if (game.phaseStart > Dusk.gameTime()) {
+    if (game.phaseStart > Rune.gameTime()) {
       return;
     }
 
 
-    if (Dusk.gameTime() - context.game.lastEnemy > getPhase(game).enemyInterval) {
-      context.game.lastEnemy = Dusk.gameTime() - spawnEnemy(context.game);
+    if (Rune.gameTime() - context.game.lastEnemy > getPhase(game).enemyInterval) {
+      context.game.lastEnemy = Rune.gameTime() - spawnEnemy(context.game);
     }
 
-    if (Dusk.gameTime() - game.lastRock > getPhase(game).rockInterval) {
+    if (Rune.gameTime() - game.lastRock > getPhase(game).rockInterval) {
       game.rocks.push({
         id: game.nextId++,
         x: Math.random() * VIEW_WIDTH,
@@ -698,7 +698,7 @@ Dusk.initLogic({
         vy: ((Math.random() * 5) + 2) * SPEED_SCALE,
         radius: 50
       })
-      game.lastRock = Dusk.gameTime();
+      game.lastRock = Rune.gameTime();
     }
 
     for (const enemy of [...game.enemies]) {
@@ -717,7 +717,7 @@ Dusk.initLogic({
         continue;
       }
       
-      const lastHit = Dusk.gameTime() - enemy.lastHit;
+      const lastHit = Rune.gameTime() - enemy.lastHit;
       if (lastHit > 3000) {
         for (const player of [...game.players]) {
           if (collide(enemy, player)) {
@@ -735,14 +735,14 @@ Dusk.initLogic({
       }
 
       if (enemy.shoot) {
-        if (enemy.waitUntil - Dusk.gameTime() < 500 && enemy.needsShoot) {
+        if (enemy.waitUntil - Rune.gameTime() < 500 && enemy.needsShoot) {
           enemy.needsShoot = false;
           bulletSpray(game, enemy, 4 + Math.min(4, Math.floor(game.phase / 3)) + Math.floor(Math.random() * 4));
         }
       }
 
       /// enemy move if not waiting
-      if (enemy.waitUntil < Dusk.gameTime()) {
+      if (enemy.waitUntil < Rune.gameTime()) {
         const dx = enemy.path[enemy.pt].x - enemy.path[enemy.pt - 1].x;
         const dy = enemy.path[enemy.pt].y - enemy.path[enemy.pt - 1].y;
         const len = Math.sqrt((dx * dx) + (dy * dy));
@@ -756,7 +756,7 @@ Dusk.initLogic({
           enemy.y = ((1 - enemy.pos) * enemy.path[enemy.pt - 1].y) + (enemy.pos * enemy.path[enemy.pt].y) + (Math.sin(Math.PI * enemy.pos) * (dx / len) * 100)
         }
         if (enemy.pos >= 1 || len == 0) {
-          enemy.waitUntil = Dusk.gameTime() + enemy.path[enemy.pt].wait;
+          enemy.waitUntil = Rune.gameTime() + enemy.path[enemy.pt].wait;
           enemy.needsShoot = true;
           enemy.pt++;
           enemy.pos = 0;
