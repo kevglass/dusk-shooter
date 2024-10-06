@@ -2,9 +2,9 @@
 
 _All game assets are licensed for use in these projects. They remain copyright of their authors._
 
-_You can find the rest of my dusk games here https://github.com/kevglass/dusk-games_
+_You can find the rest of my rune games here https://github.com/kevglass/rune-games_
 
-This is a rough hack up making using the Dusk SDK (https://dusk.ai). 
+This is a rough hack up making using the rune SDK (https://rune.gg). 
 
-![image](https://github.com/kevglass/dusk-shooter/assets/3787210/fc96b97c-d3dc-4831-be78-c23a68d4ce65)
+![image](https://github.com/kevglass/rune-shooter/assets/3787210/fc96b97c-d3dc-4831-be78-c23a68d4ce65)
 
